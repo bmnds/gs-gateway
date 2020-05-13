@@ -11,6 +11,7 @@ import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -34,6 +35,9 @@ public class ApplicationTests {
 			.willReturn(aResponse()
 				.withBody("no fallback")
 				.withFixedDelay(3000)));
+		stubFor(get(urlEqualTo("/anything?foo=bar"))
+				.willReturn(aResponse()
+						.withBody("{\"args\":{\"foo\":\"bar\"}}")));
 
 		webClient
 			.get().uri("/get")
@@ -50,5 +54,16 @@ public class ApplicationTests {
 			.expectBody()
 			.consumeWith(
 				response -> assertThat(response.getResponseBody()).isEqualTo("fallback".getBytes()));
+		
+		webClient
+			.get().uri("/anything?foo=bar")
+			.header("Host", "www.throttle.com")
+			.exchange()
+			.expectStatus().isOk();
+		webClient
+			.get().uri("/anything?foo=bar")
+			.header("Host", "www.throttle.com")
+			.exchange()
+			.expectStatus().isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
 	}
 }
